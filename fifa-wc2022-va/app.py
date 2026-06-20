@@ -103,7 +103,7 @@ with tab1:
 with tab2:
     tab2_match.render()
     st.divider()
-    st.info("Shot map + 360 freeze-frames and animated scrubber (2.4, 2.2) coming next in Phase 2")
+    st.info("Animated time-scrubber (2.2) coming next in Phase 2")
 with tab3:
     tab3_player.render()
 with tab4:

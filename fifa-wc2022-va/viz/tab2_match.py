@@ -267,8 +267,142 @@ def render_passing_network() -> None:
     )
 
 
+# --- 2.4 Shot Map + 360 Freeze-Frames --------------------------------------
+
+def build_shot_map_figure(shots: pd.DataFrame, colors: dict) -> go.Figure:
+    """Half-pitch shot map: position = location, size = xG, colour = outcome."""
+    fig = get_pitch_figure(half=True, height=560)
+    if shots.empty:
+        return fig
+    for outcome, grp in shots.groupby("shot_outcome"):
+        fig.add_trace(go.Scatter(
+            x=grp["x"], y=grp["y"], mode="markers", name=str(outcome),
+            marker=dict(
+                size=8 + 34 * grp["xg"], sizemode="diameter",
+                color=styling.outcome_color(outcome),
+                symbol=["star" if g else "circle" for g in (grp["shot_outcome"] == "Goal")],
+                line=dict(color="#0e1117", width=1), opacity=0.85),
+            customdata=np.stack([grp["id"], grp["player"].fillna("—"), grp["xg"],
+                                 grp["minute"]], axis=-1),
+            hovertemplate="<b>%{customdata[1]}</b><br>min %{customdata[3]:.0f} · xG %{customdata[2]:.2f}<br>"
+                          f"{outcome}<extra></extra>",
+        ))
+    return fig
+
+
+def build_freeze_frame_figure(frame: pd.DataFrame, shot_row) -> go.Figure:
+    """Render a single shot's 360 freeze-frame: players + shot trajectory."""
+    fig = get_pitch_figure(half=True, height=520)
+    fx = frame.copy()
+    fx["fx"] = fx["location"].apply(lambda v: float(v[0]) if v is not None else None)
+    fx["fy"] = fx["location"].apply(lambda v: float(v[1]) if v is not None else None)
+
+    groups = [
+        (fx[(fx["teammate"]) & (~fx["keeper"]) & (~fx["actor"])], "Teammates",
+         styling.TEAM_COLORS["home"], "circle"),
+        (fx[(~fx["teammate"]) & (~fx["keeper"])], "Opponents",
+         styling.TEAM_COLORS["away"], "circle"),
+        (fx[fx["keeper"]], "Goalkeeper", styling.PALETTE["accent2"], "diamond"),
+    ]
+    for g, name, col, sym in groups:
+        if g.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=g["fx"], y=g["fy"], mode="markers", name=name,
+            marker=dict(size=12, color=col, symbol=sym, line=dict(color="#0e1117", width=1)),
+            hoverinfo="skip", showlegend=True))
+
+    # shooter + shot trajectory
+    sx, sy = shot_row["x"], shot_row["y"]
+    ex, ey = shot_row["end_x"], shot_row["end_y"]
+    fig.add_trace(go.Scatter(
+        x=[sx], y=[sy], mode="markers", name="Shooter",
+        marker=dict(size=15, color="white", symbol="star", line=dict(color="#0e1117", width=1))))
+    if pd.notna(ex) and pd.notna(ey):
+        col = styling.outcome_color(shot_row["shot_outcome"])
+        fig.add_annotation(x=ex, y=ey, ax=sx, ay=sy, xref="x", yref="y", axref="x", ayref="y",
+                           showarrow=True, arrowhead=2, arrowwidth=3, arrowcolor=col)
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=1.02, x=0,
+                                                   font=dict(size=9)))
+    return fig
+
+
+def render_shot_map() -> None:
+    """Visual 2.4 — Shot Map with linked 360 freeze-frames."""
+    st.subheader("Shot Map & 360 Freeze-Frames")
+    mid = state.get_match_id()
+    if not mid:
+        st.info("Pick a **match** in the sidebar to see its shot map.")
+        st.caption("Every shot by location (size = xG, colour = outcome); click one for its 360 freeze-frame.")
+        return
+
+    match_row = loader.load_matches().set_index("match_id").loc[mid]
+    teams = [match_row["home_team"], match_row["away_team"]]
+    colors = _team_colors(match_row)
+    events = loader.load_events(mid)
+    shots = transforms.get_shots(events)
+    shots = shots[shots["period"] < 5] if not shots.empty else shots
+
+    f1, f2 = st.columns(2)
+    with f1:
+        team_sel = st.radio("Team", ["Both", *teams], horizontal=True, key="sm_team")
+    with f2:
+        body = st.radio("Body part", ["All", "Foot", "Head"], horizontal=True, key="sm_body")
+    if team_sel != "Both":
+        shots = shots[shots["team"] == team_sel]
+    if body != "All":
+        parts = {"Left Foot", "Right Foot"} if body == "Foot" else {"Head"}
+        shots = shots[shots["shot_body_part"].isin(parts)]
+
+    # apply the global time-window brush from 2.1
+    tr = state.get_time_range()
+    if tr:
+        shots = shots[shots["minute"].between(tr[0], tr[1])]
+
+    if shots.empty:
+        st.warning("No shots match these filters.")
+        st.caption("Every shot by location (size = xG, colour = outcome); click one for its 360 freeze-frame.")
+        return
+
+    left, right = st.columns([3, 2])
+    with left:
+        event = st.plotly_chart(build_shot_map_figure(shots, colors), width="stretch",
+                                key="shotmap_fig", on_select="rerun", selection_mode="points")
+        points = (event.get("selection", {}) or {}).get("points", []) if event else []
+        if points:
+            sid = points[0].get("customdata", [None])[0]
+            if sid:
+                st.session_state["sel_shot_id"] = sid
+                st.rerun()
+
+    # default to the highest-xG shot if none picked
+    sel_id = st.session_state.get("sel_shot_id")
+    if sel_id not in set(shots["id"]):
+        sel_id = shots.loc[shots["xg"].idxmax(), "id"]
+    shot_row = shots[shots["id"] == sel_id].iloc[0]
+
+    with right:
+        frame = loader.load_360(mid)
+        frame = frame[frame["id"] == sel_id] if not frame.empty else frame
+        if frame.empty:
+            st.info("No 360 freeze-frame available for this shot.")
+        else:
+            st.plotly_chart(build_freeze_frame_figure(frame, shot_row), width="stretch",
+                            key="freeze_fig")
+        st.caption(f"**{shot_row['player']}** · min {int(shot_row['minute'])} · "
+                   f"xG {shot_row['xg']:.2f} · {shot_row['shot_outcome']}")
+
+    st.caption(
+        f"{len(shots)} shots shown. Marker size = xG, colour = outcome, ★ = goal. "
+        "Click a shot to load its 360 freeze-frame (white ★ shooter, amber ◆ keeper)."
+        + (f" Time filter {tr[0]}–{tr[1]}′ active." if tr else "")
+    )
+
+
 def render() -> None:
     """Streamlit entry for Tab 2 — Match Analysis."""
     render_momentum()
     st.divider()
     render_passing_network()
+    st.divider()
+    render_shot_map()
