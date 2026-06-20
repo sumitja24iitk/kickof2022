@@ -102,8 +102,6 @@ with tab1:
     tab1_tournament.render()
 with tab2:
     tab2_match.render()
-    st.divider()
-    st.info("Animated time-scrubber (2.2) coming next in Phase 2")
 with tab3:
     tab3_player.render()
 with tab4:

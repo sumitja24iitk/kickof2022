@@ -399,6 +399,121 @@ def render_shot_map() -> None:
     )
 
 
+# --- 2.2 Animated Time-Scrubber --------------------------------------------
+
+MAX_FRAMES = 160  # cap so client-side animation stays smooth
+SPEEDS = {"Slow": 600, "Normal": 300, "Fast": 120}  # ms per frame
+
+
+def _xy(loc):
+    return (float(loc[0]), float(loc[1])) if loc is not None else (None, None)
+
+
+def build_scrubber_figure(events: pd.DataFrame, frames360: pd.DataFrame,
+                          colors: dict, teams: list, frame_ms: int) -> go.Figure:
+    """Plotly native animation: ball + 360 players stepping through match events."""
+    fig = get_pitch_figure(height=560)
+
+    ev = events.copy()
+    ev[["x", "y"]] = ev["location"].apply(lambda v: pd.Series(_xy(v)))
+    ev = ev.dropna(subset=["x", "y"]).sort_values("index")
+    if len(ev) > MAX_FRAMES:
+        ev = ev.iloc[:: max(1, len(ev) // MAX_FRAMES)]
+
+    # pre-group 360 players by event id
+    players_by_id: dict = {}
+    if not frames360.empty:
+        f = frames360.copy()
+        f[["px", "py"]] = f["location"].apply(lambda v: pd.Series(_xy(v)))
+        for eid, g in f.groupby("id"):
+            players_by_id[eid] = g
+
+    def player_trace(eid):
+        g = players_by_id.get(eid)
+        if g is None or g.empty:
+            return go.Scatter(x=[], y=[], mode="markers", name="Players")
+        cols = [colors[teams[0]] if t else colors[teams[1]] for t in g["teammate"]]
+        return go.Scatter(x=g["px"], y=g["py"], mode="markers", name="Players",
+                          marker=dict(size=10, color=cols, line=dict(color="white", width=0.5)),
+                          hoverinfo="skip")
+
+    def ball_trace(row):
+        return go.Scatter(x=[row["x"]], y=[row["y"]], mode="markers", name="Ball",
+                          marker=dict(size=13, color="white", symbol="circle",
+                                      line=dict(color="#0e1117", width=1)),
+                          hovertext=f"min {int(row['minute'])} · {row['type']}", hoverinfo="text")
+
+    rows = list(ev.itertuples(index=False))
+    first = ev.iloc[0]
+    fig.add_trace(ball_trace(first))
+    fig.add_trace(player_trace(first["id"]))
+
+    frames, steps = [], []
+    for i, r in enumerate(ev.itertuples(index=False)):
+        rd = r._asdict()
+        frames.append(go.Frame(name=str(i), data=[ball_trace(rd), player_trace(rd["id"])]))
+        steps.append(dict(method="animate", label=str(int(rd["minute"])),
+                          args=[[str(i)], dict(mode="immediate",
+                                               frame=dict(duration=0, redraw=True),
+                                               transition=dict(duration=0))]))
+    fig.frames = frames
+
+    fig.update_layout(
+        updatemenus=[dict(
+            type="buttons", direction="left", x=0.02, y=1.08, xanchor="left",
+            buttons=[
+                dict(label="▶ Play", method="animate",
+                     args=[None, dict(frame=dict(duration=frame_ms, redraw=True),
+                                      fromcurrent=True, transition=dict(duration=0))]),
+                dict(label="⏸ Pause", method="animate",
+                     args=[[None], dict(frame=dict(duration=0, redraw=False),
+                                        mode="immediate")]),
+            ],
+        )],
+        sliders=[dict(active=0, x=0.02, len=0.96, y=0, currentvalue=dict(prefix="min "),
+                      steps=steps)],
+        showlegend=False,
+    )
+    return fig
+
+
+def render_scrubber() -> None:
+    """Visual 2.2 — Animated Time-Scrubber on the pitch."""
+    st.subheader("Animated Time-Scrubber")
+    mid = state.get_match_id()
+    if not mid:
+        st.info("Pick a **match** in the sidebar to scrub through it on the pitch.")
+        st.caption("Ball and 360 players animated through the match — press play or drag the slider.")
+        return
+
+    match_row = loader.load_matches().set_index("match_id").loc[mid]
+    teams = [match_row["home_team"], match_row["away_team"]]
+    colors = _team_colors(match_row)
+    events = loader.load_events(mid)
+    events = events[events["period"] < 5]
+
+    tr = state.get_time_range()
+    if tr:
+        events = events[events["minute"].between(tr[0], tr[1])]
+
+    speed = st.radio("Speed", list(SPEEDS), index=1, horizontal=True, key="scrub_speed")
+    ev_loc = events[events["location"].notna()]
+    if ev_loc.empty:
+        st.warning("No located events to animate in this window.")
+        return
+
+    frames360 = loader.load_360(mid)
+    fig = build_scrubber_figure(events, frames360, colors, teams, SPEEDS[speed])
+    st.plotly_chart(fig, width="stretch", key="scrub_fig")
+
+    win = f"minutes {tr[0]}–{tr[1]}" if tr else "the full match"
+    has360 = "with 360 player positions" if not frames360.empty else "(no 360 data for this match)"
+    st.caption(
+        f"Scrub through {win} {has360}. White = ball; coloured dots = visible players "
+        f"({teams[0]} vs {teams[1]}). Capped at {MAX_FRAMES} frames for smooth playback."
+    )
+
+
 def render() -> None:
     """Streamlit entry for Tab 2 — Match Analysis."""
     render_momentum()
@@ -406,3 +521,5 @@ def render() -> None:
     render_passing_network()
     st.divider()
     render_shot_map()
+    st.divider()
+    render_scrubber()
