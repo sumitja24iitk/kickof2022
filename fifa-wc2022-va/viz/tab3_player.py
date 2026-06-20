@@ -208,7 +208,7 @@ def render_progression() -> None:
 
 _SHOT_COLS = [
     "player", "type", "location", "shot_end_location", "shot_statsbomb_xg",
-    "shot_outcome", "minute", "match_id", "period",
+    "shot_outcome", "shot_body_part", "minute", "match_id", "period",
 ]
 
 
@@ -317,6 +317,90 @@ def render_shots3d() -> None:
     )
 
 
+# --- 3.4 Goalmouth Placement Plot ------------------------------------------
+
+# StatsBomb goal: mouth y in [36, 44] (8 yd wide), crossbar at 2.67 yd (8 ft).
+GOAL_Y0, GOAL_Y1, CROSSBAR = 36.0, 44.0, 2.67
+
+BODY_FILTERS = {
+    "All": None,
+    "Foot": {"Left Foot", "Right Foot"},
+    "Head": {"Head"},
+}
+
+
+def build_goalmouth_figure(shots: pd.DataFrame) -> go.Figure:
+    """Where shots ended in the goal-frame plane: x = end_y, y = end height (z)."""
+    fig = go.Figure()
+    labels = _match_labels()
+
+    # goal frame (posts + crossbar) — drawn as a rectangle outline
+    fig.add_shape(type="rect", x0=GOAL_Y0, y0=0, x1=GOAL_Y1, y1=CROSSBAR,
+                  line=dict(color=styling.PALETTE["pitch_line"], width=3))
+
+    pts = shots.copy()
+    pts["z"] = pts["end_z"].fillna(0.0)
+    for outcome, grp in pts.groupby("shot_outcome"):
+        is_goal = outcome == "Goal"
+        fig.add_trace(go.Scatter(
+            x=grp["end_y"], y=grp["z"], mode="markers", name=str(outcome),
+            marker=dict(size=11 if is_goal else 8, color=styling.outcome_color(outcome),
+                        symbol="star" if is_goal else "circle",
+                        line=dict(color="#0e1117", width=1)),
+            customdata=np.stack([grp["match_id"].map(labels).fillna(""),
+                                 grp["minute"], grp["xg"]], axis=-1),
+            hovertemplate="%{customdata[0]}<br>min %{customdata[1]:.0f} · xG %{customdata[2]:.2f}<br>"
+                          f"{outcome}<extra></extra>",
+        ))
+
+    fig.update_layout(
+        height=440, margin=dict(l=40, r=20, t=30, b=40),
+        plot_bgcolor=styling.PALETTE["panel"], paper_bgcolor=styling.PALETTE["bg"],
+        font=dict(color=styling.PALETTE["text"]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
+        # reverse x so left post (y=36) is on the viewer's left, behind-goal view
+        xaxis=dict(title="across goal (yd)", range=[34, 46], autorange="reversed",
+                   gridcolor="#232a33", zeroline=False),
+        yaxis=dict(title="height (yd)", range=[0, 4], gridcolor="#232a33", zeroline=False,
+                   scaleanchor="x", scaleratio=1),
+    )
+    return fig
+
+
+def render_goalmouth() -> None:
+    """Visual 3.4 — Goalmouth Placement Plot."""
+    st.subheader("Goalmouth Placement")
+    player = state.get_player()
+    if not player:
+        st.info("Pick a **match** then a **player** in the sidebar to see where their shots were placed.")
+        st.caption("Shot end-placement in the goal-frame plane — scored, saved, on/off target.")
+        return
+
+    c1, c2 = st.columns(2)
+    with c1:
+        body = st.radio("Body part", list(BODY_FILTERS), horizontal=True, key="gm_body")
+    with c2:
+        scope = st.radio("Scope", ["This match", "Whole tournament"], horizontal=True, key="gm_scope")
+
+    match_id = state.get_match_id() if scope == "This match" else None
+    shots = get_player_shots(player, match_id)
+    shots = shots.dropna(subset=["end_y"]) if not shots.empty else shots
+    parts = BODY_FILTERS[body]
+    if parts is not None and not shots.empty:
+        shots = shots[shots["shot_body_part"].isin(parts)]
+
+    if shots.empty:
+        st.warning(f"No {body.lower()} shots for {player} in this scope.")
+    else:
+        st.plotly_chart(build_goalmouth_figure(shots), width="stretch", key="gm_fig")
+
+    scope_txt = "this match" if match_id is not None else "the whole tournament"
+    st.caption(
+        f"{player}'s {body.lower()} shot placement across {scope_txt} ({len(shots)} shots) — "
+        "the white box is the goal frame; stars are goals."
+    )
+
+
 def render() -> None:
     """Streamlit entry for Tab 3 — Player Spotlight."""
     render_heatmap()
@@ -324,3 +408,5 @@ def render() -> None:
     render_progression()
     st.divider()
     render_shots3d()
+    st.divider()
+    render_goalmouth()

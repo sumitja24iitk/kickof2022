@@ -108,7 +108,5 @@ with tab2:
     st.info("Shot map + 360 freeze-frames and animated scrubber (2.4, 2.2) coming next in Phase 2")
 with tab3:
     tab3_player.render()
-    st.divider()
-    st.info("Goalmouth placement plot (3.4) coming next in Phase 2")
 with tab4:
     st.info("Tab 4 — Tactical (Voronoi pitch control, xT surface) · Phase 2")
