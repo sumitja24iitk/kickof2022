@@ -23,7 +23,13 @@ st.set_page_config(
 styling.inject_css()
 state.init_state()
 
-matches = loader.load_matches()
+try:
+    matches = loader.load_matches()
+except FileNotFoundError as exc:
+    st.error("⚠️ Data cache not found.")
+    st.code(str(exc))
+    st.info("Run the fetch script once, then reload:\n\n```\npython scripts/fetch_data.py\n```")
+    st.stop()
 
 TABS = [
     ("Tournament", "🏆 Tournament"),
@@ -116,12 +122,17 @@ st.caption("An interactive visual analytics system · CS661 Course Project")
 render_nav()
 st.divider()
 
+_RENDERERS = {
+    "Tournament": tab1_tournament.render,
+    "Match": tab2_match.render,
+    "Player": tab3_player.render,
+    "Tactical": tab4_advanced.render,
+}
+
 active = st.session_state.get("active_tab", "Tournament")
-if active == "Tournament":
-    tab1_tournament.render()
-elif active == "Match":
-    tab2_match.render()
-elif active == "Player":
-    tab3_player.render()
-elif active == "Tactical":
-    tab4_advanced.render()
+try:
+    _RENDERERS.get(active, tab1_tournament.render)()
+except Exception as exc:  # never white-screen the whole app on one visual's error
+    st.error(f"Something went wrong rendering the {active} tab.")
+    with st.expander("Error details"):
+        st.exception(exc)

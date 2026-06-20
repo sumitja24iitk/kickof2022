@@ -69,21 +69,32 @@ _CSS = f"""
         border-right: 1px solid #232a33;
     }}
 
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 4px;
+    /* Button-based tab navigation */
+    .stButton > button {{
+        border-radius: 8px;
+        font-weight: 600;
+        border: 1px solid #2a3340;
+        transition: background-color 0.15s ease;
     }}
-    .stTabs [data-baseweb="tab"] {{
-        background-color: {PALETTE["panel"]};
-        border-radius: 8px 8px 0 0;
-        padding: 8px 18px;
-    }}
-    .stTabs [aria-selected="true"] {{
+    .stButton > button[kind="primary"] {{
         background-color: {PALETTE["pitch"]};
+        border-color: {PALETTE["pitch"]};
         color: #ffffff;
     }}
+    .stButton > button[kind="secondary"]:hover {{
+        border-color: {PALETTE["accent"]};
+        color: {PALETTE["accent"]};
+    }}
 
-    h1, h2, h3 {{ color: {PALETTE["text"]}; }}
+    h1 {{
+        color: {PALETTE["text"]};
+        border-bottom: 2px solid {PALETTE["pitch"]};
+        padding-bottom: 6px;
+    }}
+    h2, h3 {{ color: {PALETTE["text"]}; }}
     .stCaption, .st-emotion-cache-1 caption {{ color: {PALETTE["muted"]}; }}
+    /* tighten block padding for a denser web-app feel */
+    .block-container {{ padding-top: 2.2rem; }}
 </style>
 """
 
