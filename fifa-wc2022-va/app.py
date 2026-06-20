@@ -1,7 +1,11 @@
 """
 app.py — Streamlit entry point: page config, styling, global sidebar filters,
-and the 4-tab router. Individual visuals live in viz/tabN_*.py (Phase 2); this
-file only owns the shell and the cross-tab filter widgets.
+and the tab router. Individual visuals live in viz/tabN_*.py.
+
+Navigation is session-state driven (not st.tabs) so visuals can switch tabs
+programmatically — clicking a bracket match jumps to the Match tab, clicking a
+team in the xG scatter jumps to the Player tab. Only the active tab renders,
+which also keeps reruns fast.
 """
 
 import streamlit as st
@@ -21,6 +25,13 @@ state.init_state()
 
 matches = loader.load_matches()
 
+TABS = [
+    ("Tournament", "🏆 Tournament"),
+    ("Match", "📊 Match"),
+    ("Player", "👤 Player"),
+    ("Tactical", "🎯 Tactical"),
+]
+
 
 def _match_label(row) -> str:
     return (
@@ -35,7 +46,6 @@ def render_sidebar() -> None:
         st.markdown("### ⚽ WC 2022 Analytics")
         st.caption("Global filters — shared across all tabs")
 
-        # --- Team ----------------------------------------------------------
         teams = sorted(set(matches["home_team"]) | set(matches["away_team"]))
         team_choice = st.selectbox(
             "Team", ["(all)"] + teams,
@@ -43,7 +53,6 @@ def render_sidebar() -> None:
         )
         state.set_team(None if team_choice == "(all)" else team_choice)
 
-        # --- Match (optionally narrowed to the selected team) --------------
         match_pool = matches
         if state.get_team():
             match_pool = matches[
@@ -63,7 +72,6 @@ def render_sidebar() -> None:
         )
         state.set_match_id(None if match_choice == "(none)" else match_choice)
 
-        # --- Player (from the selected match's events) --------------------
         players: list[str] = []
         if state.get_match_id():
             ev = loader.load_events(state.get_match_id())
@@ -89,20 +97,31 @@ def render_sidebar() -> None:
         st.caption(f"{len(matches)} matches · StatsBomb open data")
 
 
+def render_nav() -> None:
+    """Button-based tab navigation bound to session_state['active_tab']."""
+    cols = st.columns(len(TABS))
+    for col, (key, label) in zip(cols, TABS):
+        is_active = st.session_state.get("active_tab") == key
+        if col.button(label, key=f"nav_{key}", width="stretch",
+                      type="primary" if is_active else "secondary"):
+            st.session_state["active_tab"] = key
+            st.rerun()
+
+
 render_sidebar()
 
 st.title("Stories from FIFA World Cup 2022")
 st.caption("An interactive visual analytics system · CS661 Course Project")
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["🏆 Tournament", "📊 Match", "👤 Player", "🎯 Tactical"]
-)
+render_nav()
+st.divider()
 
-with tab1:
+active = st.session_state.get("active_tab", "Tournament")
+if active == "Tournament":
     tab1_tournament.render()
-with tab2:
+elif active == "Match":
     tab2_match.render()
-with tab3:
+elif active == "Player":
     tab3_player.render()
-with tab4:
+elif active == "Tactical":
     tab4_advanced.render()

@@ -233,11 +233,12 @@ def render_bracket() -> None:
         mid = points[0].get("customdata")
         if mid and mid != state.get_match_id():
             state.set_match_id(int(mid))
+            st.session_state["active_tab"] = "Match"  # jump to Match tab
             st.rerun()
 
     if state.get_match_id():
         row = matches.set_index("match_id").loc[state.get_match_id()]
-        st.success(f"Selected **{row.home_team} v {row.away_team}** — open the **Match** tab to dive in.")
+        st.success(f"Selected **{row.home_team} v {row.away_team}** — switching to the **Match** tab.")
     st.caption(
         "Full Round-of-16 → Final bracket with scores. Click any match to load it into the "
         "Match tab; hover for goalscorers and date."
@@ -255,16 +256,17 @@ def render_xg_scatter() -> None:
         on_select="rerun", selection_mode="points",
     )
 
-    # click -> set the global team filter
+    # click -> set the global team filter and jump to the Player tab
     points = (event.get("selection", {}) or {}).get("points", []) if event else []
     if points:
         team = points[0].get("customdata", [None])[0]
         if team and team != state.get_team():
             state.set_team(team)
+            st.session_state["active_tab"] = "Player"
             st.rerun()
 
     if state.get_team():
-        st.success(f"Filtering by **{state.get_team()}** — open the Player tab to drill in.")
+        st.success(f"Filtering by **{state.get_team()}** — switching to the Player tab to drill in.")
 
     st.caption(
         "Each team plotted by expected goals vs goals scored; points above the "
