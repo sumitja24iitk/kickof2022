@@ -15,8 +15,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from analytics import network_metrics
 from data import loader, transforms
 from utils import state, styling
+from viz.pitch import get_pitch_figure
 
 RED_CARDS = {"Red Card", "Second Yellow"}
 
@@ -116,8 +118,8 @@ def y_max_x(shots: pd.DataFrame) -> float:
     return float(shots["t"].max()) + 2
 
 
-def render() -> None:
-    """Streamlit entry for visual 2.1 — the Tab 2 linking hub."""
+def render_momentum() -> None:
+    """Visual 2.1 — Match Momentum (the Tab 2 linking hub)."""
     st.subheader("Match Momentum — Cumulative xG")
     mid = state.get_match_id()
     if not mid:
@@ -170,3 +172,103 @@ def render() -> None:
         f"{match_row['home_score']}–{match_row['away_score']} final. "
         "Stars = goals, 🟥 = red card, triangles = subs. Box-select to brush a minute window."
     )
+
+
+# --- 2.3 Passing Network with Centrality -----------------------------------
+
+def _surname(name: str) -> str:
+    return str(name).split()[-1] if pd.notna(name) else ""
+
+
+def build_network_figure(nodes: pd.DataFrame, edges: pd.DataFrame) -> go.Figure:
+    """Draw the passing network over the pitch: edges then centrality-coloured nodes."""
+    fig = get_pitch_figure(height=560)
+    if nodes.empty:
+        return fig
+    pos = nodes.set_index("player")[["x", "y"]]
+
+    # edges: width scaled by pass count
+    max_count = edges["count"].max() if not edges.empty else 1
+    for e in edges.itertuples():
+        if e.a not in pos.index or e.b not in pos.index:
+            continue
+        x0, y0 = pos.loc[e.a]
+        x1, y1 = pos.loc[e.b]
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1], mode="lines",
+            line=dict(color="rgba(233,238,242,0.35)", width=1 + 6 * e.count / max_count),
+            hoverinfo="skip", showlegend=False,
+        ))
+        fig.add_trace(go.Scatter(
+            x=[(x0 + x1) / 2], y=[(y0 + y1) / 2], mode="markers",
+            marker=dict(size=10, color="rgba(0,0,0,0)"),
+            hovertemplate=f"{_surname(e.a)} ↔ {_surname(e.b)}<br>"
+                          f"{e.count} passes · {e.completion:.0%} completed<extra></extra>",
+            showlegend=False,
+        ))
+
+    # nodes: size = passes, colour = betweenness
+    fig.add_trace(go.Scatter(
+        x=nodes["x"], y=nodes["y"], mode="markers+text",
+        text=[_surname(p) for p in nodes["player"]], textposition="bottom center",
+        textfont=dict(size=9, color=styling.PALETTE["text"]),
+        marker=dict(
+            size=12 + 28 * nodes["passes"] / max(nodes["passes"].max(), 1),
+            color=nodes["betweenness"], colorscale="Plasma", showscale=True,
+            colorbar=dict(title="Betweenness", thickness=12),
+            line=dict(color="#0e1117", width=1),
+        ),
+        customdata=np.stack([nodes["player"], nodes["passes"], nodes["betweenness"]], axis=-1),
+        hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]} passes<br>"
+                      "betweenness %{customdata[2]:.3f}<extra></extra>",
+        showlegend=False,
+    ))
+    return fig
+
+
+def render_passing_network() -> None:
+    """Visual 2.3 — Dynamic passing network with centrality."""
+    st.subheader("Passing Network & Centrality")
+    mid = state.get_match_id()
+    if not mid:
+        st.info("Pick a **match** in the sidebar to build its passing network.")
+        st.caption("Players at average position; edge width = pass volume, node colour = betweenness centrality.")
+        return
+
+    match_row = loader.load_matches().set_index("match_id").loc[mid]
+    teams = [match_row["home_team"], match_row["away_team"]]
+    events = loader.load_events(mid)
+    max_min = int(events["minute"].max())
+
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        team = st.radio("Team", teams, key="net_team")
+    with c2:
+        # default the window to the global brush (2.1) if one is active
+        tr = state.get_time_range() or (0, max_min)
+        default = (max(0, tr[0]), min(max_min, tr[1]))
+        window = st.slider("Minute window", 0, max_min, default, key="net_window")
+
+    passes = transforms.get_passes(events)
+    passes = passes[(passes["team"] == team) & passes["minute"].between(window[0], window[1])]
+    nodes, edges = network_metrics.build_network(passes, min_pair=2)
+
+    if nodes.empty:
+        st.warning(f"Not enough completed passes for {team} in minutes {window[0]}–{window[1]}.")
+        return
+
+    st.plotly_chart(build_network_figure(nodes, edges), width="stretch", key="net_fig")
+
+    key = nodes.loc[nodes["betweenness"].idxmax(), "player"]
+    st.caption(
+        f"{team} passing network, minutes {window[0]}–{window[1]} "
+        f"({int(passes['completed'].sum())} completed passes). Node size = passes made, "
+        f"colour = betweenness centrality. Key connector: **{key}**."
+    )
+
+
+def render() -> None:
+    """Streamlit entry for Tab 2 — Match Analysis."""
+    render_momentum()
+    st.divider()
+    render_passing_network()
