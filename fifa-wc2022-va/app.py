@@ -8,7 +8,7 @@ import streamlit as st
 
 from data import loader
 from utils import state, styling
-from viz import tab1_tournament, tab2_match, tab3_player
+from viz import tab1_tournament, tab2_match, tab3_player, tab4_advanced
 
 st.set_page_config(
     page_title="Stories from FIFA WC 2022",
@@ -107,4 +107,6 @@ with tab2:
 with tab3:
     tab3_player.render()
 with tab4:
-    st.info("Tab 4 — Tactical (Voronoi pitch control, xT surface) · Phase 2")
+    tab4_advanced.render()
+    st.divider()
+    st.info("Expected Threat (xT) surface + possession replay (4.2) coming next in Phase 2")
