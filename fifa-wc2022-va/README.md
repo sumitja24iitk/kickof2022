@@ -1,5 +1,5 @@
 # FIFA World Cup 2022 — Visual Analytics
-#Tanmay Jain
+
 CS661 course project. Interactive visual analytics web app built with Streamlit + Plotly
 over StatsBomb open data for the 2022 FIFA World Cup.
 
