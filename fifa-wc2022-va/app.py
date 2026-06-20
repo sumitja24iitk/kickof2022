@@ -106,5 +106,3 @@ with tab3:
     tab3_player.render()
 with tab4:
     tab4_advanced.render()
-    st.divider()
-    st.info("Expected Threat (xT) surface + possession replay (4.2) coming next in Phase 2")
