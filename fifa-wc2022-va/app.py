@@ -100,8 +100,6 @@ tab1, tab2, tab3, tab4 = st.tabs(
 
 with tab1:
     tab1_tournament.render()
-    st.divider()
-    st.info("Knockout bracket (1.1) coming next in Phase 2")
 with tab2:
     tab2_match.render()
     st.divider()
