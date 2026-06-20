@@ -106,6 +106,25 @@ def get_passes(events: pd.DataFrame, completed_only: bool = False) -> pd.DataFra
     return out.reset_index(drop=True)
 
 
+def get_carries(events: pd.DataFrame) -> pd.DataFrame:
+    """One row per carry with start (x, y) and end (end_x, end_y) coordinates."""
+    carries = events[events["type"] == "Carry"].copy()
+    if carries.empty:
+        return carries
+
+    carries["x"] = _coord(carries["location"], 0)
+    carries["y"] = _coord(carries["location"], 1)
+    carries["end_x"] = _coord(carries["carry_end_location"], 0)
+    carries["end_y"] = _coord(carries["carry_end_location"], 1)
+
+    keep = [
+        "id", "match_id", "minute", "second", "period", "team", "player",
+        "position", "x", "y", "end_x", "end_y", "possession",
+    ]
+    keep = [c for c in keep if c in carries.columns]
+    return carries[keep].reset_index(drop=True)
+
+
 def get_possessions(events: pd.DataFrame) -> pd.DataFrame:
     """
     Collapse the event stream into one row per possession sequence.
