@@ -8,7 +8,7 @@ import streamlit as st
 
 from data import loader
 from utils import state, styling
-from viz import tab1_tournament
+from viz import tab1_tournament, tab3_player
 
 st.set_page_config(
     page_title="Stories from FIFA WC 2022",
@@ -105,6 +105,8 @@ with tab1:
 with tab2:
     st.info("Tab 2 — Match analysis (momentum, scrubber, passing net, shot map) · Phase 2")
 with tab3:
-    st.info("Tab 3 — Player spotlight (heatmap, progression, 3D shots, goalmouth) · Phase 2")
+    tab3_player.render()
+    st.divider()
+    st.info("Progressive map, 3D shots, goalmouth (3.2–3.4) coming next in Phase 2")
 with tab4:
     st.info("Tab 4 — Tactical (Voronoi pitch control, xT surface) · Phase 2")
