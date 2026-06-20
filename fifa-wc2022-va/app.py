@@ -8,7 +8,7 @@ import streamlit as st
 
 from data import loader
 from utils import state, styling
-from viz import tab1_tournament, tab3_player
+from viz import tab1_tournament, tab2_match, tab3_player
 
 st.set_page_config(
     page_title="Stories from FIFA WC 2022",
@@ -103,7 +103,9 @@ with tab1:
     st.divider()
     st.info("Knockout bracket (1.1) coming next in Phase 2")
 with tab2:
-    st.info("Tab 2 — Match analysis (momentum, scrubber, passing net, shot map) · Phase 2")
+    tab2_match.render()
+    st.divider()
+    st.info("Passing network, shot map, animated scrubber (2.2–2.4) coming next in Phase 2")
 with tab3:
     tab3_player.render()
     st.divider()
