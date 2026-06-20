@@ -37,20 +37,97 @@ button to clear caches.
 
 ## The 12 visualizations
 
-| Tab | # | Visualization | What it shows |
-|-----|---|---------------|---------------|
-| **Tournament** | 1.1 | Interactive Knockout Bracket | R16→Final structure with scores; click a match to jump to the Match tab |
-| | 1.2 | xG vs Goals Scatter | Team finishing efficiency vs a y=x line; click a team → Player tab |
-| **Match** | 2.1 | Match Momentum | Cumulative xG timeline; box-select brushes a minute window (linking hub) |
-| | 2.2 | Animated Time-Scrubber | Ball + 360 players animated through the match (Plotly frames) |
-| | 2.3 | Passing Network | Players at avg position; edge = pass volume, colour = betweenness centrality |
-| | 2.4 | Shot Map + 360 | Every shot (size=xG, colour=outcome); click → 360 freeze-frame panel |
-| **Player** | 3.1 | Action Density Heatmap | Where a player operates (action-type + scope toggles) |
-| | 3.2 | Progressive Pass & Carry Map | Passes/carries that moved the ball ≥25% closer to goal |
-| | 3.3 | 3D Shot Trajectories | Player's shots arcing toward goal in 3D |
-| | 3.4 | Goalmouth Placement | Shot end-placement in the goal-frame plane |
-| **Tactical** | 4.1 | Voronoi Pitch Control | Pitch partitioned by which team controls each zone (scipy + shapely) |
-| | 4.2 | xT Surface + Possession Replay | Markov-chain Expected Threat grid; animate a possession's xT gain |
+### Tab 1 — Tournament
+
+#### 1.1 Interactive Knockout Bracket
+![Knockout Bracket](docs/screenshots/tab1_bracket.png)
+
+R16→Final structure with scores. Click any match to jump directly to that match in the Match tab.
+
+---
+
+#### 1.2 xG vs Goals Scatter
+![xG vs Goals Scatter](docs/screenshots/tab1_xg_scatter.png)
+
+Team finishing efficiency plotted against a y=x reference line. Over-performers sit above the line; click a team dot to navigate to the Player tab for that squad.
+
+---
+
+### Tab 2 — Match
+
+#### 2.1 Match Momentum
+![Match Momentum](docs/screenshots/tab2_momentum.png)
+
+Cumulative xG timeline for both teams across the match. Box-select any minute window to brush-link the Shot Map, Passing Network, and Time-Scrubber to that time range.
+
+---
+
+#### 2.2 Animated Time-Scrubber
+![Animated Time-Scrubber](docs/screenshots/tab2_scrubber.png)
+
+Ball position and 360 player locations animated through the match using Plotly frames. Scrub to any moment; linked to the momentum brush window.
+
+---
+
+#### 2.3 Passing Network
+![Passing Network](docs/screenshots/tab2_passing_network.png)
+
+Players plotted at their average positions; edge thickness = pass volume, edge colour = betweenness centrality. Reveals the structural spine of each team's build-up play.
+
+---
+
+#### 2.4 Shot Map + 360 Freeze-Frame
+![Shot Map and 360 Freeze-Frame](docs/screenshots/tab2_shot_map.png)
+
+Every shot on the pitch (size = xG, colour = outcome). Click any shot to open a 360 freeze-frame panel showing all 22 players at the moment of the attempt.
+
+---
+
+### Tab 3 — Player
+
+#### 3.1 Action Density Heatmap
+![Action Density Heatmap](docs/screenshots/tab3_heatmap.png)
+
+KDE heatmap showing where a player operates on the pitch. Toggle action type (passes, carries, shots, duels) and scope (all matches vs single match).
+
+---
+
+#### 3.2 Progressive Pass & Carry Map
+![Progressive Pass and Carry Map](docs/screenshots/tab3_progressive.png)
+
+All passes and carries that moved the ball ≥25% closer to goal, drawn as arrows on the pitch. Shows a player's direct contribution to advancing possession.
+
+---
+
+#### 3.3 3D Shot Trajectories
+![3D Shot Trajectories](docs/screenshots/tab3_3d_shots.png)
+
+The player's shots rendered as arcs toward goal in 3D (Plotly surface). Colour encodes outcome; height encodes the ball's flight path.
+
+---
+
+#### 3.4 Goalmouth Placement
+![Goalmouth Placement](docs/screenshots/tab3_goalmouth.png)
+
+Shot end-placement projected onto the goal-frame plane. Immediately shows where a player targets (corners, low, high) and which attempts were saved vs scored.
+
+---
+
+### Tab 4 — Tactical
+
+#### 4.1 Voronoi Pitch Control
+![Voronoi Pitch Control](docs/screenshots/tab4_voronoi.png)
+
+The pitch partitioned into zones controlled by each team using Voronoi tessellation (scipy + shapely). Colour intensity shows how contested each region is.
+
+---
+
+#### 4.2 xT Surface + Possession Replay
+![xT Surface and Possession Replay](docs/screenshots/tab4_xt.png)
+
+Markov-chain Expected Threat grid overlaid on the pitch. Animate any selected possession sequence to watch the xT value climb as the ball progresses toward goal.
+
+---
 
 Cross-tab links: **bracket → Match**, **team scatter → Player**, **momentum brush → shot
 map / passing network / scrubber** (all share `session_state`).
