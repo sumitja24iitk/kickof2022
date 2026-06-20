@@ -8,6 +8,7 @@ import streamlit as st
 
 from data import loader
 from utils import state, styling
+from viz import tab1_tournament
 
 st.set_page_config(
     page_title="Stories from FIFA WC 2022",
@@ -80,7 +81,7 @@ def render_sidebar() -> None:
         state.set_player(None if player_choice == "(all)" else player_choice)
 
         st.divider()
-        if st.button("🔄 Refresh data", use_container_width=True,
+        if st.button("🔄 Refresh data", width="stretch",
                      help="Clear cached parquet loads and reload from disk"):
             loader.clear_cache()
             st.rerun()
@@ -98,7 +99,9 @@ tab1, tab2, tab3, tab4 = st.tabs(
 )
 
 with tab1:
-    st.info("Tab 1 — Tournament overview (knockout bracket, xG scatter) · Phase 2")
+    tab1_tournament.render()
+    st.divider()
+    st.info("Knockout bracket (1.1) coming next in Phase 2")
 with tab2:
     st.info("Tab 2 — Match analysis (momentum, scrubber, passing net, shot map) · Phase 2")
 with tab3:
