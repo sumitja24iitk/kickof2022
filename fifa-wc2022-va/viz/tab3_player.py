@@ -204,8 +204,123 @@ def render_progression() -> None:
     )
 
 
+# --- 3.3 3D Shot Trajectories ----------------------------------------------
+
+_SHOT_COLS = [
+    "player", "type", "location", "shot_end_location", "shot_statsbomb_xg",
+    "shot_outcome", "minute", "match_id", "period",
+]
+
+
+@st.cache_data(show_spinner=False)
+def _shots_all_events() -> pd.DataFrame:
+    return loader.load_all_events(columns=_SHOT_COLS)
+
+
+@st.cache_data(show_spinner=False)
+def _match_labels() -> dict:
+    m = loader.load_matches()
+    return {int(r.match_id): f"{r.home_team} v {r.away_team}" for r in m.itertuples()}
+
+
+def get_player_shots(player: str, match_id: int | None) -> pd.DataFrame:
+    """Player's shots with flattened coords incl. end height (z)."""
+    if match_id is not None:
+        ev = loader.load_events(int(match_id))
+    else:
+        ev = _shots_all_events()
+    ev = ev[ev["player"] == player]
+    shots = transforms.get_shots(ev)
+    if shots.empty:
+        return shots
+    return shots[shots["period"] < 5].reset_index(drop=True)
+
+
+def build_shots3d_figure(shots: pd.DataFrame) -> go.Figure:
+    """Parabolic 3D trajectories from shot location to the goal-frame end point."""
+    fig = go.Figure()
+    labels = _match_labels()
+
+    for s in shots.itertuples():
+        end_z = s.end_z if pd.notna(s.end_z) else 0.0
+        dist = float(np.hypot(s.end_x - s.x, s.end_y - s.y))
+        lift = min(4.0, 0.10 * dist) + end_z * 0.3  # stylised arc height (yards)
+        t = np.linspace(0, 1, 24)
+        xs = s.x + (s.end_x - s.x) * t
+        ys = s.y + (s.end_y - s.y) * t
+        zs = end_z * t + 4 * lift * t * (1 - t)
+        col = styling.outcome_color(s.shot_outcome)
+        is_goal = s.shot_outcome == "Goal"
+        fig.add_trace(go.Scatter3d(
+            x=xs, y=ys, z=zs, mode="lines",
+            line=dict(color=col, width=6 if is_goal else 3),
+            opacity=1.0 if is_goal else 0.6, showlegend=False,
+            hovertext=f"{labels.get(int(s.match_id),'')}<br>min {int(s.minute)} · "
+                      f"xG {s.xg:.2f} · {s.shot_outcome}",
+            hoverinfo="text",
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[s.end_x], y=[s.end_y], z=[zs[-1]], mode="markers",
+            marker=dict(size=5 if is_goal else 3, color=col,
+                        symbol="diamond" if is_goal else "circle"),
+            showlegend=False, hoverinfo="skip",
+        ))
+
+    # goal frame at x=120 (mouth y 36-44, crossbar 2.67 yd)
+    gx, gy0, gy1, cb = 120, 36, 44, 2.67
+    for seg in ([[gx, gx], [gy0, gy0], [0, cb]], [[gx, gx], [gy1, gy1], [0, cb]],
+                [[gx, gx], [gy0, gy1], [cb, cb]]):
+        fig.add_trace(go.Scatter3d(x=seg[0], y=seg[1], z=seg[2], mode="lines",
+                                   line=dict(color=styling.PALETTE["pitch_line"], width=4),
+                                   showlegend=False, hoverinfo="skip"))
+
+    fig.update_layout(
+        height=600, margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor=styling.PALETTE["bg"], font=dict(color=styling.PALETTE["text"]),
+        scene=dict(
+            xaxis=dict(title="x (toward goal)", range=[60, 122], backgroundcolor=styling.PALETTE["pitch"],
+                       gridcolor="#2a3340"),
+            yaxis=dict(title="y", range=[0, 80], backgroundcolor=styling.PALETTE["pitch"],
+                       gridcolor="#2a3340"),
+            zaxis=dict(title="height (yd)", range=[0, 8], backgroundcolor=styling.PALETTE["bg"],
+                       gridcolor="#2a3340"),
+            aspectmode="manual", aspectratio=dict(x=2, y=2.4, z=0.6),
+            camera=dict(eye=dict(x=-1.6, y=-1.4, z=0.9)),
+        ),
+    )
+    return fig
+
+
+def render_shots3d() -> None:
+    """Visual 3.3 — 3D Shot Trajectories."""
+    st.subheader("3D Shot Trajectories")
+    player = state.get_player()
+    if not player:
+        st.info("Pick a **match** then a **player** in the sidebar to see their shots in 3D.")
+        st.caption("Each shot arcs from its location toward the goal; colour = outcome, height = trajectory.")
+        return
+
+    scope = st.radio("Scope", ["This match", "Whole tournament"], horizontal=True, key="s3d_scope")
+    match_id = state.get_match_id() if scope == "This match" else None
+    shots = get_player_shots(player, match_id)
+
+    if shots.empty:
+        st.warning(f"No shots for {player} in this scope.")
+    else:
+        st.plotly_chart(build_shots3d_figure(shots), width="stretch", key="s3d_fig")
+
+    scope_txt = "this match" if match_id is not None else "the whole tournament"
+    n_goal = int((shots["shot_outcome"] == "Goal").sum()) if not shots.empty else 0
+    st.caption(
+        f"{player}'s {len(shots)} shots across {scope_txt} ({n_goal} goals) in 3D — "
+        "drag to rotate. Green = goal; line height traces the ball's flight."
+    )
+
+
 def render() -> None:
     """Streamlit entry for Tab 3 — Player Spotlight."""
     render_heatmap()
     st.divider()
     render_progression()
+    st.divider()
+    render_shots3d()

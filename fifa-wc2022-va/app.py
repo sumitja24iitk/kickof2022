@@ -109,6 +109,6 @@ with tab2:
 with tab3:
     tab3_player.render()
     st.divider()
-    st.info("3D shot trajectories and goalmouth plot (3.3–3.4) coming next in Phase 2")
+    st.info("Goalmouth placement plot (3.4) coming next in Phase 2")
 with tab4:
     st.info("Tab 4 — Tactical (Voronoi pitch control, xT surface) · Phase 2")
