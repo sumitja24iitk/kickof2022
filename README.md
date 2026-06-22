@@ -6,9 +6,10 @@ including the 360 freeze-frame dataset. Drill from tournament-wide trends down t
 single shot's tactical context.
 
 Project contributors:
-Hardik Singh
-Dwij Sukhadiya
-Sumit Jain
+
+Hardik Singh  
+Dwij Sukhadiya  
+Sumit Jain  
 Tanmay Jain
 
 Stack: **Streamlit · Plotly · statsbombpy · mplsoccer · scipy · networkx · shapely · pandas**
