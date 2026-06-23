@@ -10,9 +10,9 @@ Project contributors:
 Hardik Singh  
 Dwij Sukhadiya  
 Sumit Jain  
-Tanmay Jain
-Darshan Tandel
-Rohit Vinod Atkurkar
+Tanmay Jain  
+Darshan Tandel  
+Rohit Vinod Atkurkar  
 Itesh Mishra
 
 Stack: **Streamlit · Plotly · statsbombpy · mplsoccer · scipy · networkx · shapely · pandas**
